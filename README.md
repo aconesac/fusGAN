@@ -1,4 +1,4 @@
-# Im2Sim: GAN-Based Ultrasound Simulation from CT Slices
+# FusGAN: GAN-Based Ultrasound Simulation from CT Slices
 
 ## Overview
 
