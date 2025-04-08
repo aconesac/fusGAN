@@ -2,7 +2,7 @@ import tensorflow as tf
 import lpips
 import torch
 
-def MSE(y_true, y_pred):
+def MSE(y_true: tf.Tensor, y_pred: tf.Tensor) -> tf.Tensor:
     """
     Returns a vector of Mean Squared Error of two (batch_size, height, width, channels) tensors
     Where each value in the vector is the MSE of the corresponding image in the batch
@@ -46,4 +46,4 @@ def LPIPS(y_true, y_pred):
     y_pred = tf.transpose(y_pred, perm=[0, 3, 1, 2])
     y_true = torch.tensor(y_true.numpy())
     y_pred = torch.tensor(y_pred.numpy())
-    return lpips_model.forward(y_true, y_pred).numpy()
+    return lpips_model.forward(y_true, y_pred).detach().numpy()

@@ -6,3 +6,4 @@ matplotlib
 tqdm
 lpips
 pandas
+pydicom

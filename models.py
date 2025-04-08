@@ -4,6 +4,7 @@ from tqdm import tqdm
 from src.config import *
 from src.metrics import MSE, PSNR, SSIM, LPIPS
 import time
+import os
 
 class GAN():
     def __init__(self, generator: tf.keras.Model = None, discriminator: tf.keras.Model = None, 
@@ -76,25 +77,39 @@ class GAN():
                     
     def evaluate(self, test_dataset):
         start_time = time.time()
-        for input_batch, target_batch in test_dataset:
-            generated_images = self.generator(input_batch, training=False)
-            discriminator_pred = self.discriminator([input_batch, generated_images], training=False)
-            discriminator_real = self.discriminator([input_batch, target_batch], training=False)
-            break
+        with tqdm(total=len(test_dataset), desc='Evaluating', position=0, leave=True) as pbar:
+            for input_batch, target_batch in test_dataset:
+                generated_images = self.generator(input_batch, training=False)
+                discriminator_pred = self.discriminator([input_batch, generated_images], training=False)
+                discriminator_real = self.discriminator([input_batch, target_batch], training=False)
+                pbar.update(1)
         end_time = time.time()
         print(f'Evaluation time: {end_time - start_time}')
         
+        print("\nCalculating metrics...")
         mse = MSE(target_batch, generated_images)
         psnr = PSNR(target_batch, generated_images)
         ssim = SSIM(target_batch, generated_images)
-        lpips = LPIPS(target_batch, generated_images)
-        
+        # lpips = LPIPS(target_batch, generated_images)
+        lpips = tf.zeros((len(target_batch), 1))
+                
         return mse, psnr, ssim, lpips, end_time - start_time
     
     def predict(self, input_batch):
         return self.generator(input_batch, training=False)
                 
-    def generate_images(self, test_input: tf.Tensor, tar: tf.Tensor):
+    def generate_images(self, test_input: tf.Tensor, tar: tf.Tensor, output_path: str = None, index: int = None, metrics: list = None):
+        """
+        Generates and saves images from the test input and target images.
+        """
+        if output_path is not None:
+            os.makedirs(output_path, exist_ok=True)
+        if index is not None:
+            output_path = os.path.join(output_path, f'generated_image_{index}.png')
+        else:
+            output_path = 'generated_image.png'
+        
+        # Getting the prediction from the generator
         prediction = self.generator(test_input, training=True)
         # plt.figure(figsize=(15,15))
 
@@ -107,7 +122,8 @@ class GAN():
             # Getting the pixel values between [0, 1] to plot it.
             plt.imshow(display_list[i] * 0.5 + 0.5)
             plt.axis('off')
-        plt.savefig('out/output.png')
+        plt.savefig(output_path)
+        plt.close()
         
     def save_model(self, generator_path: str, discriminator_path: str):
         self.generator.save(generator_path)

@@ -4,3 +4,7 @@ data/test/
 data/train/
 data/val/
 
+.qodo
+SavedModels/
+results/
+CTHeadThin001/
