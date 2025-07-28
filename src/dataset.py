@@ -139,6 +139,11 @@ class ImDataset():
     def __init__(self, path: str, filenames: list = None, reshape: tuple = RESHAPE, batch_size: int = BATCH_SIZE, shuffle: bool = SHUFFLE, augment: bool = AUGMENT, resize: list = RESIZE, normalize: str = NORMALIZATION):
         super().__init__(filenames, path, reshape, batch_size, shuffle, augment, resize, normalize)
         
+        if filenames is None:
+            self.filenames = self.setFilenames(path)
+        else:   
+            self.filenames = filenames
+        
     def setFilenames(self, path):
         ctimages_path = os.path.join(path, 'ct_slices')
         piimages_path = os.path.join(path, 'pi_maps')
@@ -148,7 +153,7 @@ class ImDataset():
         piimages = [os.path.join(piimages_path, f) for f in os.listdir(piimages_path)]
         maskimages = [os.path.join(transmask_path, f) for f in os.listdir(transmask_path)]
         
-        self.filenames = list(zip(ctimages, piimages, maskimages))
+        return list(zip(ctimages, piimages, maskimages))
 
     
     def readFile(self, filesnames):
@@ -164,11 +169,11 @@ class ImDataset():
         
         maskimage = tf.io.read_file(file[2])
         maskimage = tf.image.decode_png(maskimage, channels=1, dtype=tf.float32)
-        
-        input = tf.concat((ctimage, piimage), axis=-1)
+
+        input = tf.concat((ctimage, maskimage), axis=-1)
         input = tf.image.resize(input, self.resize, method='bilinear')
         
-        output = tf.image.resize(maskimage, self.resize, method='bilinear')
+        output = tf.image.resize(piimage, self.resize, method='bilinear')
         
         return input, output
         

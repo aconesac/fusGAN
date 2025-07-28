@@ -1,0 +1,69 @@
+{
+  "title": "fusGAN: Neuro-Evolution GAN for Image Generation",
+  "description": "This project utilizes Generative Adversarial Networks (GANs) to generate ultrasound simulations from CT slices and a transducer mask. By leveraging GANs, the system can produce realistic ultrasound intensity maps given a CT scan and a transducer mask input. This repository contains the source code for training and testing GAN models with comprehensive evaluation metrics including MSE, PSNR, SSIM, and LPIPS.",
+  "creators": [
+    {
+        "name": "Agustin Conesa",
+        "affiliation": "Hospital del Mar Research Institute (IMIM)",
+        "orcid": "0000-0002-0058-6705"
+    },
+    {
+      "name": "Oliver Diaz",
+      "affiliation": "Universitat de Barcelona",
+      "orcid": "0000-0001-6789-5177"
+    },
+    {
+      "name": "Richard Osuala",
+      "affiliation": "Universitat de Barcelona",
+      "orcid": "0000-0003-1835-8564"
+    },
+    {
+      "name": "Pablo Villoslada",
+      "affiliation": "Universitat de Barcelona",
+      "orcid": "0000-0002-8735-6119"
+    }
+  ],
+  "license": "MIT",
+  "upload_type": "software",
+  "keywords": [
+    "GAN",
+    "Generative Adversarial Networks",
+    "Neuro-Evolution",
+    "Deep Learning",
+    "TensorFlow",
+    "Image Generation",
+    "Machine Learning"
+  ],
+  "related_identifiers": [
+    {
+      "identifier": "https://github.com/aconesac/fusGAN",
+      "relation": "isSupplementTo",
+      "scheme": "url"
+    }
+  ],
+  "communities": [
+    {
+      "identifier": "zenodo"
+    }
+  ],
+  "exclude_paths": [
+    "__pycache__/**",
+    "*.pyc",
+    "*.pyo",
+    "*.pyd",
+    ".venv/**",
+    "venv/**",
+    "env/**",
+    ".git/**",
+    ".gitignore",
+    "*.log",
+    ".DS_Store",
+    "Thumbs.db",
+    ".pytest_cache/**",
+    ".coverage",
+    "htmlcov/**",
+    "*.egg-info/**",
+    "dist/**",
+    "build/**"
+  ]
+}

@@ -38,6 +38,7 @@ data = {
     'LPIPS': lpips_mean,
     'Time': time,
 }
+
 evaluations_df = pd.DataFrame(data=data, index=[0])
 print(evaluations_df)
 
