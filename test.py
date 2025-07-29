@@ -1,8 +1,12 @@
 import os
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'  # Suppress TensorFlow logging (1=INFO, 2=WARNING, 3=ERROR)
+import warnings
+
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'  # Suppress TensorFlow logging (1=INFO, 2=WARNING, 3=ERROR)
+warnings.filterwarnings("ignore")
 
 import tensorflow as tf
 tf.get_logger().setLevel('ERROR')  # Suppress TensorFlow logging (1=INFO, 2=WARNING, 3=ERROR)
+
 from models import GAN, Generator, Discriminator
 from src.dataset import MatDataset
 import os
@@ -38,10 +42,11 @@ data = {
     'LPIPS': lpips_mean,
     'Time': time,
 }
-
 evaluations_df = pd.DataFrame(data=data, index=[0])
 print(evaluations_df)
 
+if not os.path.exists("results/"):
+    os.mkdir("results")
 evaluations_df.to_csv('results/evaluation_results.csv', index=False)
 
 # Generate images
