@@ -3,6 +3,10 @@ from models import GAN, Generator, Discriminator
 from src.dataset import MatDataset
 from src.parser import parse_arguments
 import os
+import src.config as config
+import json
+from datetime import datetime
+import platform
 
 # Parse command line arguments
 # args = parse_arguments()
@@ -12,15 +16,24 @@ import os
 train_filenames = [os.path.join('data/train', f) for f in os.listdir('data/train') if f.endswith('.mat')]
 train_dataset = MatDataset(train_filenames).dataset
 
+# Store dataset info for training record
+dataset_info = {
+    'train_files_count': len(train_filenames),
+    'train_files': train_filenames[:10],  # Store first 10 filenames as sample
+    'data_directory': 'data/train'
+}
+
 # Define optimizers
 generator_optimizer = tf.keras.optimizers.Adam(2e-4, beta_1=0.5)
 discriminator_optimizer = tf.keras.optimizers.Adam(2e-4, beta_1=0.5)
 
 # Check if models exist for retraining
+model_retraining = False
 if os.path.exists('SavedModels/generator.keras') and os.path.exists('SavedModels/discriminator.keras'):
     print("Loading existing models for retraining...")
     generator = tf.keras.models.load_model('SavedModels/generator.keras')
     discriminator = tf.keras.models.load_model('SavedModels/discriminator.keras')
+    model_retraining = True
 else:
     print("Creating new models...")
     generator = Generator(2, 1).model
@@ -33,8 +46,84 @@ loss_object = tf.keras.losses.BinaryCrossentropy(from_logits=True)
 gan = GAN(generator, discriminator, generator_optimizer, discriminator_optimizer, loss_object)
 
 # Train the model
-epochs = 150
-gan.fit(train_dataset, epochs)
+epochs = 1
+training_start_time = datetime.now()
+print(f"Training started at: {training_start_time}")
+
+history = gan.fit(train_dataset, epochs)
+
+training_end_time = datetime.now()
+training_duration = training_end_time - training_start_time
+print(f"Training completed at: {training_end_time}")
+print(f"Total training duration: {training_duration}")
 
 # Save the models
 gan.save_model('SavedModels/generatorRetrain.keras', 'SavedModels/discriminatorRetrain.keras')
+
+# Save to a json file all the important information about the training
+training_info = {
+    # Training metadata
+    'training_id': f"training_{training_start_time.strftime('%Y%m%d_%H%M%S')}",
+    'training_start_time': training_start_time.isoformat(),
+    'training_end_time': training_end_time.isoformat(),
+    'training_duration_seconds': training_duration.total_seconds(),
+    'training_duration_str': str(training_duration),
+    
+    # Model information
+    'model_retraining': model_retraining,
+    'generator_model': 'SavedModels/generatorRetrain.keras',
+    'discriminator_model': 'SavedModels/discriminatorRetrain.keras',
+    'generator_params': generator.count_params(),
+    'discriminator_params': discriminator.count_params(),
+    
+    # Training parameters
+    'epochs': epochs,
+    'generator_optimizer': str(generator_optimizer.get_config()),
+    'discriminator_optimizer': str(discriminator_optimizer.get_config()),
+    'loss_object': str(loss_object.get_config()),
+    
+    # Dataset information
+    'dataset_info': dataset_info,
+    
+    # Configuration from config.py
+    'config': {
+        'BATCH_SIZE': config.BATCH_SIZE,
+        'SHUFFLE': config.SHUFFLE,
+        'AUGMENT': config.AUGMENT,
+        'RESIZE': config.RESIZE,
+        'RESHAPE': config.RESHAPE,
+        'TRAIN_EPOCHS': config.TRAIN_EPOCHS,
+        'LEARNING_RATE': config.LEARNING_RATE,
+        'LAMBDA': config.LAMBDA,
+        'NORMALIZATION': config.NORMALIZATION,
+        'BUFFER_SIZE': config.BUFFER_SIZE
+    },
+    
+    # System information
+    'system_info': {
+        'tensorflow_version': tf.__version__,
+        'python_version': platform.python_version(),
+        'platform': platform.platform(),
+        'gpu_available': tf.config.list_physical_devices('GPU'),
+        'gpu_count': len(tf.config.list_physical_devices('GPU'))
+    },
+    
+    # File paths for reproducibility
+    'paths': {
+        'train_data_dir': 'data/train',
+        'saved_models_dir': 'SavedModels',
+        'training_script': 'train.py'
+    }
+}
+
+# Save training info to JSON file
+training_info_filename = f"SavedModels/training_info_{training_start_time.strftime('%Y%m%d_%H%M%S')}.json"
+with open(training_info_filename, 'w') as f:
+    json.dump(training_info, f, indent=4, default=str)
+
+# Also save a copy as the latest training info
+with open('SavedModels/training_info_latest.json', 'w') as f:
+    json.dump(training_info, f, indent=4, default=str)
+
+print(f"Training info saved to: {training_info_filename}")
+print(f"Latest training info saved to: SavedModels/training_info_latest.json")
