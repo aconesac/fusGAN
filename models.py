@@ -32,6 +32,13 @@ class GAN():
         generated_loss = self.loss_object(tf.zeros_like(disc_generated_output), disc_generated_output)
         total_disc_loss = real_loss + generated_loss
         return total_disc_loss
+    
+    def discriminator_accuracy_fn(self, disc_real_output: tf.Tensor, disc_generated_output: tf.Tensor):
+        real_predictions = tf.cast(disc_real_output > 0.5, tf.float32)
+        generated_predictions = tf.cast(disc_generated_output < 0.5, tf.float32)
+        real_accuracy = tf.reduce_mean(real_predictions)
+        generated_accuracy = tf.reduce_mean(generated_predictions)
+        return real_accuracy, generated_accuracy
 
     @tf.function
     def train_step(self, input_image: tf.Tensor, target: tf.Tensor):
@@ -55,23 +62,29 @@ class GAN():
         self.discriminator_loss(disc_loss)
         self.l1_loss(l1_loss)
         
+        real_accuracy, generated_accuracy = self.discriminator_accuracy_fn(disc_real_output, disc_generated_output)
+        
+        return gen_loss, disc_loss, l1_loss, real_accuracy, generated_accuracy
+        
     def fit(self, train_dataset, epochs: int):
-        history = {'generator_loss': [], 'discriminator_loss': [], 'l1_loss': []}
+        history = {'generator_loss': [], 'discriminator_loss': [], 'l1_loss': [], 
+                  'real_acc': [], 'gen_acc': []}
         with tqdm(total=epochs) as pbar:
             for epoch in range(epochs):
                 with tqdm(total=len(train_dataset), desc=f'Epoch {epoch+1}/{epochs}', position=0, leave=True) as pbar2:
                     for input_image, target in train_dataset:
-                        losses = self.train_step(input_image, target)
-                        [history[key].append(loss) for key, loss in zip(history.keys(), [self.generator_loss.result().numpy(), self.discriminator_loss.result().numpy(), self.l1_loss.result().numpy()])]
-                        pbar2.set_postfix(generator_loss=self.generator_loss.result().numpy(), discriminator_loss=self.discriminator_loss.result().numpy(), l1_loss=self.l1_loss.result().numpy())
+                        gen_loss, disc_loss, l1_loss, real_accuracy, generated_accuracy = self.train_step(input_image, target)
+                        [history[key].append(loss) for key, loss in zip(history.keys(), [gen_loss.numpy(), disc_loss.numpy(), l1_loss.numpy(), real_accuracy.numpy(), generated_accuracy.numpy()])]
+                        pbar2.set_postfix(gen_loss=gen_loss.numpy(), disc_loss=disc_loss.numpy(), l1_loss=l1_loss.numpy(), real_acc=real_accuracy.numpy(), gen_acc=generated_accuracy.numpy())
                         pbar2.update(1)
                         
                     # print(f'Epoch {epoch+1}, Generator Loss: {self.generator_loss.result()}, Discriminator Loss: {self.discriminator_loss.result()}')
                     self.generator_loss.reset_state()
                     self.discriminator_loss.reset_state()
+                    self.l1_loss.reset_state()
                     pbar.update(1)
                     
-                self.generate_images(input_image, target)   
+                self.generate_images(input_image, target, output_path="out")   
                     
         return history
                     

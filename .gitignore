@@ -3,6 +3,7 @@ __pycache__/
 data/test/
 data/train/
 data/val/
+generated_image*
 
 .qodo
 SavedModels/
