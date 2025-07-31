@@ -6,6 +6,6 @@ data/val/
 generated_image*
 
 .qodo
-SavedModels/
+Saved*
 results/
 CTHeadThin001/

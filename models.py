@@ -24,14 +24,14 @@ class GAN():
         self.real_accuracy = tf.keras.metrics.Mean(name='real_accuracy')
 
     def generator_loss_fn(self, disc_generated_output: tf.Tensor, gen_output, target: tf.Tensor):
-        gan_loss = self.loss_object(tf.ones_like(disc_generated_output), disc_generated_output)
-        l1_loss = tf.reduce_mean(tf.abs(target - gen_output))
+        gan_loss = self.loss_object(tf.ones_like(disc_generated_output), disc_generated_output) # Generator wants discriminator to think generated images are real
+        l1_loss = tf.reduce_mean(tf.abs(target - gen_output)) # L1 loss for image reconstruction
         total_gen_loss = gan_loss + (LAMBDA * l1_loss)
         return total_gen_loss, gan_loss, l1_loss
 
     def discriminator_loss_fn(self, disc_real_output: tf.Tensor, disc_generated_output: tf.Tensor):
-        real_loss = self.loss_object(tf.ones_like(disc_real_output), disc_real_output)
-        generated_loss = self.loss_object(tf.zeros_like(disc_generated_output), disc_generated_output)
+        real_loss = self.loss_object(tf.ones_like(disc_real_output) * 0.9, disc_real_output)
+        generated_loss = self.loss_object(tf.zeros_like(disc_generated_output) + 0.1, disc_generated_output)
         total_disc_loss = real_loss + generated_loss
         return total_disc_loss
     
@@ -192,8 +192,8 @@ class GAN():
         mse = MSE(target_batch, generated_images)
         psnr = PSNR(target_batch, generated_images)
         ssim = SSIM(target_batch, generated_images)
-        # lpips = LPIPS(target_batch, generated_images)
-        lpips = tf.zeros((len(target_batch), 1))
+        lpips = LPIPS(target_batch, generated_images)
+        # lpips = tf.zeros((len(target_batch), 1))
                 
         return mse, psnr, ssim, lpips, end_time - start_time
     

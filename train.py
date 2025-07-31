@@ -1,5 +1,5 @@
 import tensorflow as tf
-from models import GAN, Generator, Discriminator
+from models import GAN, Generator, Discriminator, SmallDiscriminator
 from src.dataset import MatDataset
 from src.parser import parse_arguments
 import os
@@ -7,6 +7,7 @@ import src.config as config
 import json
 from datetime import datetime
 import platform
+import pandas as pd
 
 # Parse command line arguments
 # args = parse_arguments()
@@ -25,7 +26,7 @@ dataset_info = {
 
 # Define optimizers
 generator_optimizer = tf.keras.optimizers.Adam(2e-4, beta_1=0.5)
-discriminator_optimizer = tf.keras.optimizers.Adam(1e-5, beta_1=0.5)
+discriminator_optimizer = tf.keras.optimizers.Adam(0.2e-4, beta_1=0.5)
 
 # Check if models exist for retraining
 model_retraining = False
@@ -38,16 +39,17 @@ if os.path.exists('SavedModels/generator.keras') and os.path.exists('SavedModels
 else:
     print("Creating new models...")
     generator = Generator(2, 1).model
-    discriminator = Discriminator(2).model
+    discriminator = SmallDiscriminator(2).model
 
 # Define loss function
-loss_object = tf.keras.losses.BinaryCrossentropy(from_logits=True)
+# loss_object = tf.keras.losses.BinaryCrossentropy(from_logits=True)
+loss_object = tf.keras.losses.MeanSquaredError()
 
 # Initialize GAN
 gan = GAN(generator, discriminator, generator_optimizer, discriminator_optimizer, loss_object)
 
 # Train the model
-epochs = 200
+epochs = 300
 training_start_time = datetime.now()
 print(f"Training started at: {training_start_time}")
 
@@ -60,8 +62,36 @@ training_duration = training_end_time - training_start_time
 print(f"Training completed at: {training_end_time}")
 print(f"Total training duration: {training_duration}")
 
+# Evaluate the model on test dataset
+test_filenames = [os.path.join('data/test', f) for f in os.listdir('data/test') if f.endswith('.mat')]
+
+print(f"\nNumber of test files: {len(test_filenames)}\n")
+# Ensure that the test dataset is not empty
+if len(test_filenames) == 0:
+    raise ValueError("No test files found in the specified directory.")
+
+test_dataset = MatDataset(test_filenames, batch_size=len(test_filenames)).dataset
+
+mse, psnr, ssim, lpips, time = gan.evaluate(test_dataset)
+
+# calculate the average of the metrics
+mse_mean = tf.reduce_mean(mse).numpy()
+psnr_mean = tf.reduce_mean(psnr).numpy()
+ssim_mean = tf.reduce_mean(ssim).numpy()
+lpips_mean = tf.reduce_mean(lpips).numpy()
+
+data = {
+    'MSE': mse_mean,
+    'PSNR': psnr_mean,
+    'SSIM': ssim_mean,
+    'LPIPS': lpips_mean,
+    'Time': time,
+}
+evaluations_df = pd.DataFrame(data=data, index=[0])
+print(evaluations_df)
+
 # Save the models
-gan.save_model('SavedModels/generator200ep.keras', 'SavedModels/discriminator200ep.keras')
+gan.save_model('SavedModels/generatorMSElossuplrDisc.keras', 'SavedModels/discriminatorMSElossuplrDisc.keras')
 
 # Save training history
 with open(f'SavedModels/training_history_{datetime.now().strftime("%Y%m%d_%H%M%S")}.json', 'w') as f:
@@ -133,7 +163,7 @@ training_info = {
         'AUGMENT': config.AUGMENT,
         'RESIZE': config.RESIZE,
         'RESHAPE': config.RESHAPE,
-        'TRAIN_EPOCHS': config.TRAIN_EPOCHS,
+        'TRAIN_EPOCHS': epochs,
         'LEARNING_RATE': config.LEARNING_RATE,
         'LAMBDA': config.LAMBDA,
         'NORMALIZATION': config.NORMALIZATION,

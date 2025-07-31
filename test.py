@@ -24,7 +24,7 @@ test_dataset = MatDataset(test_filenames, batch_size=len(test_filenames)).datase
 
 gan = GAN()
 
-gan.load_model('SavedModels/generator.keras', 'SavedModels/discriminator.keras')
+gan.load_model('SavedModels/generatorMSElossuplrDisc.keras','SavedModels/discriminatorMSElossuplrDisc.keras')
 
 mse, psnr, ssim, lpips, time = gan.evaluate(test_dataset)
 
@@ -33,7 +33,6 @@ mse_mean = tf.reduce_mean(mse).numpy()
 psnr_mean = tf.reduce_mean(psnr).numpy()
 ssim_mean = tf.reduce_mean(ssim).numpy()
 lpips_mean = tf.reduce_mean(lpips).numpy()
-
 
 data = {
     'MSE': mse_mean,
@@ -45,15 +44,16 @@ data = {
 evaluations_df = pd.DataFrame(data=data, index=[0])
 print(evaluations_df)
 
-if not os.path.exists("results/"):
-    os.mkdir("results")
-evaluations_df.to_csv('results/evaluation_results.csv', index=False)
+resultsPath = 'results/upDisc'
+if not os.path.exists(resultsPath):
+    os.makedirs(resultsPath, exist_ok=True)
+evaluations_df.to_csv(resultsPath + '/evaluation_results.csv', index=False)
 
 # Generate images
-output_path = 'results/generated_images'
+output_path = resultsPath + '/generated_images'
 os.makedirs(output_path, exist_ok=True)
 with tqdm(total=len(test_filenames), desc="Generating images") as pbar:
     for i, (mse_val, psnr_val, ssim_val, lpips_val) in enumerate(zip(mse, psnr, ssim, lpips)):
         test_input, tar = next(iter(test_dataset.take(1)))
-        gan.generate_images(test_input, tar, output_path=output_path, index=i, metrics=[mse_val.numpy(), psnr_val.numpy(), ssim_val.numpy(), lpips_val.numpy()])
+        gan.generate_images(test_input, tar, output_path=output_path, index=i, metrics=[mse_val.numpy(), psnr_val.numpy(), ssim_val.numpy(), lpips_val])
         pbar.update(1)
