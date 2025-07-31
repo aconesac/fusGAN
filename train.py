@@ -1,13 +1,15 @@
+import os
+os.environ['MPLBACKEND'] = 'Agg'  # Set matplotlib backend before any imports
+
 import tensorflow as tf
 from models import GAN, Generator, Discriminator, SmallDiscriminator
 from src.dataset import MatDataset
 from src.parser import parse_arguments
-import os
-import src.config as config
-import json
+from src.statistics import print_detailed_statistics, create_test_results_dict
+from src.visualization import plot_training_history, create_metrics_visualization
+from src.logging_utils import create_training_info, save_training_info, save_training_history
+import numpy as np
 from datetime import datetime
-import platform
-import pandas as pd
 
 # Parse command line arguments
 # args = parse_arguments()
@@ -49,7 +51,7 @@ loss_object = tf.keras.losses.MeanSquaredError()
 gan = GAN(generator, discriminator, generator_optimizer, discriminator_optimizer, loss_object)
 
 # Train the model
-epochs = 300
+epochs = 1
 training_start_time = datetime.now()
 print(f"Training started at: {training_start_time}")
 
@@ -66,135 +68,40 @@ print(f"Total training duration: {training_duration}")
 test_filenames = [os.path.join('data/test', f) for f in os.listdir('data/test') if f.endswith('.mat')]
 
 print(f"\nNumber of test files: {len(test_filenames)}\n")
-# Ensure that the test dataset is not empty
 if len(test_filenames) == 0:
     raise ValueError("No test files found in the specified directory.")
 
 test_dataset = MatDataset(test_filenames, batch_size=len(test_filenames)).dataset
-
 mse, psnr, ssim, lpips, time = gan.evaluate(test_dataset)
 
-# calculate the average of the metrics
-mse_mean = tf.reduce_mean(mse).numpy()
-psnr_mean = tf.reduce_mean(psnr).numpy()
-ssim_mean = tf.reduce_mean(ssim).numpy()
-lpips_mean = tf.reduce_mean(lpips).numpy()
+# Convert to numpy arrays for statistics calculation
+mse_values = mse.numpy()
+psnr_values = psnr.numpy()
+ssim_values = ssim.numpy()
+lpips_values = lpips
 
-data = {
-    'MSE': mse_mean,
-    'PSNR': psnr_mean,
-    'SSIM': ssim_mean,
-    'LPIPS': lpips_mean,
-    'Time': time,
-}
-evaluations_df = pd.DataFrame(data=data, index=[0])
-print(evaluations_df)
+# Print comprehensive statistics
+print_detailed_statistics(mse_values, psnr_values, ssim_values, lpips_values, time)
+
+# Create test results dictionary for logging
+test_results = create_test_results_dict(test_filenames, mse_values, psnr_values, ssim_values, lpips_values, time)
 
 # Save the models
-gan.save_model('SavedModels/generatorMSElossuplrDisc.keras', 'SavedModels/discriminatorMSElossuplrDisc.keras')
+gan.save_model('SavedModels/generatortrial.keras', 'SavedModels/discriminatortrial.keras')
 
 # Save training history
-with open(f'SavedModels/training_history_{datetime.now().strftime("%Y%m%d_%H%M%S")}.json', 'w') as f:
-    json.dump({k: [float(x) for x in v] if isinstance(v, list) else float(v) 
-           for k, v in history.items()}, f, indent=4)
+save_training_history(history)
 
-# Plot training history
-import matplotlib.pyplot as plt
-plt.figure(figsize=(12, 6))
-plt.subplot(1, 2, 1)
-plt.plot(history['generator_loss'], label='Generator Loss')
-plt.plot(history['discriminator_loss'], label='Discriminator Loss')
-plt.plot(history['l1_loss'], label='L1 Loss')
-plt.title('Training Loss')
-plt.xlabel('Epochs')
-plt.ylabel('Loss')
-plt.legend()
-plt.subplot(1, 2, 2)
-plt.plot(history['real_acc'], label='Real Accuracy')
-plt.plot(history['gen_acc'], label='Generated Accuracy')
-plt.title('Discriminator Accuracy')
-plt.xlabel('Epochs')
-plt.ylabel('Accuracy')
-plt.legend()
-plt.savefig(f'SavedModels/training_history_plot_{datetime.now().strftime("%Y%m%d_%H%M%S")}.png')
+# Create and save visualizations
+plot_training_history(history)
+create_metrics_visualization(mse_values, psnr_values, ssim_values, lpips_values)
 
-# Save to a json file all the important information about the training
-training_info = {
-    # Training metadata
-    'training_id': f"training_{training_start_time.strftime('%Y%m%d_%H%M%S')}",
-    'training_start_time': training_start_time.isoformat(),
-    'training_end_time': training_end_time.isoformat(),
-    'training_duration_seconds': training_duration.total_seconds(),
-    'training_duration_str': str(training_duration),
-    
-    # Model information
-    'model_retraining': model_retraining,
-    'generator_model': 'SavedModels/generatorRetrain.keras',
-    'discriminator_model': 'SavedModels/discriminatorRetrain.keras',
-    'generator_params': generator.count_params(),
-    'discriminator_params': discriminator.count_params(),
-    
-    # Training parameters
-    'epochs': epochs,
-    'discriminator_ratio': disc_ratio,  # Number of discriminator training steps per cycle
-    'generator_ratio': gen_ratio,      # Number of generator training steps per cycle
-    'training_method': 'batch_level_ratios',  # Indicates ratios are applied at batch level
-    'generator_optimizer': str(generator_optimizer.get_config()),
-    'discriminator_optimizer': str(discriminator_optimizer.get_config()),
-    'loss_object': str(loss_object.get_config()),
-    
-    # Dataset information
-    'dataset_info': dataset_info,
-    
-    # Training history summary
-    'training_results': {
-        'final_generator_loss': float(history['generator_loss'][-1]) if history['generator_loss'] else None,
-        'final_discriminator_loss': float(history['discriminator_loss'][-1]) if history['discriminator_loss'] else None,
-        'final_l1_loss': float(history['l1_loss'][-1]) if history['l1_loss'] else None,
-        'final_real_accuracy': float(history['real_acc'][-1]) if history['real_acc'] else None,
-        'final_generated_accuracy': float(history['gen_acc'][-1]) if history['gen_acc'] else None,
-        'training_stable': True if len(history['generator_loss']) == epochs else False
-    },
-    
-    # Configuration from config.py
-    'config': {
-        'BATCH_SIZE': config.BATCH_SIZE,
-        'SHUFFLE': config.SHUFFLE,
-        'AUGMENT': config.AUGMENT,
-        'RESIZE': config.RESIZE,
-        'RESHAPE': config.RESHAPE,
-        'TRAIN_EPOCHS': epochs,
-        'LEARNING_RATE': config.LEARNING_RATE,
-        'LAMBDA': config.LAMBDA,
-        'NORMALIZATION': config.NORMALIZATION,
-        'BUFFER_SIZE': config.BUFFER_SIZE
-    },
-    
-    # System information
-    'system_info': {
-        'tensorflow_version': tf.__version__,
-        'python_version': platform.python_version(),
-        'platform': platform.platform(),
-        'gpu_available': tf.config.list_physical_devices('GPU'),
-        'gpu_count': len(tf.config.list_physical_devices('GPU'))
-    },
-    
-    # File paths for reproducibility
-    'paths': {
-        'train_data_dir': 'data/train',
-        'saved_models_dir': 'SavedModels',
-        'training_script': 'train.py'
-    }
-}
+# Create and save comprehensive training information
+training_info = create_training_info(
+    training_start_time, training_end_time, training_duration,
+    model_retraining, generator, discriminator, epochs,
+    disc_ratio, gen_ratio, generator_optimizer, discriminator_optimizer,
+    loss_object, dataset_info, history, test_results
+)
 
-# Save training info to JSON file
-training_info_filename = f"SavedModels/training_info_{training_start_time.strftime('%Y%m%d_%H%M%S')}.json"
-with open(training_info_filename, 'w') as f:
-    json.dump(training_info, f, indent=4, default=str)
-
-# Also save a copy as the latest training info
-with open('SavedModels/training_info_latest.json', 'w') as f:
-    json.dump(training_info, f, indent=4, default=str)
-
-print(f"Training info saved to: {training_info_filename}")
-print(f"Latest training info saved to: SavedModels/training_info_latest.json")
+save_training_info(training_info, training_start_time)
