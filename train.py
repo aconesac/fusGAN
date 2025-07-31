@@ -52,8 +52,8 @@ training_start_time = datetime.now()
 print(f"Training started at: {training_start_time}")
 
 disc_ratio = 1  # Number of discriminator training steps per cycle
-gen_ratio 
-history = gan.fit(train_dataset, epochs, discriminator_ratio=1, generator_ratio=3)
+gen_ratio = 3  # Number of generator training steps per cycle
+history = gan.fit(train_dataset, epochs, disc_steps=disc_ratio, gen_steps=gen_ratio)
 
 training_end_time = datetime.now()
 training_duration = training_end_time - training_start_time
