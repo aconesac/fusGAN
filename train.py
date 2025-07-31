@@ -25,7 +25,7 @@ dataset_info = {
 
 # Define optimizers
 generator_optimizer = tf.keras.optimizers.Adam(2e-4, beta_1=0.5)
-discriminator_optimizer = tf.keras.optimizers.Adam(1e-5, beta_1=0.5)
+discriminator_optimizer = tf.keras.optimizers.Adam(2e-4, beta_1=0.5)
 
 # Check if models exist for retraining
 model_retraining = False
