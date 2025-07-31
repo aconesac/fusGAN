@@ -13,7 +13,7 @@ import platform
 # paths = [args.ct_data_path, args.mask_data_path, args.output_path]
 
 # Load data
-train_filenames = [os.path.join('data/train', f) for f in os.listdir('data/train') if f.endswith('.mat')][:32]
+train_filenames = [os.path.join('data/train', f) for f in os.listdir('data/train') if f.endswith('.mat')]
 train_dataset = MatDataset(train_filenames).dataset
 
 # Store dataset info for training record
@@ -25,11 +25,12 @@ dataset_info = {
 
 # Define optimizers
 generator_optimizer = tf.keras.optimizers.Adam(2e-4, beta_1=0.5)
-discriminator_optimizer = tf.keras.optimizers.Adam(2e-4, beta_1=0.5)
+discriminator_optimizer = tf.keras.optimizers.Adam(1e-5, beta_1=0.5)
 
 # Check if models exist for retraining
 model_retraining = False
-if os.path.exists('SavedModels/generator.keras') and os.path.exists('SavedModels/discriminator.keras'):
+retrain = 'no'  # Set to 'yes' to retrain existing models, 'no' to create new ones
+if os.path.exists('SavedModels/generator.keras') and os.path.exists('SavedModels/discriminator.keras') and retrain == 'yes':
     print("Loading existing models for retraining...")
     generator = tf.keras.models.load_model('SavedModels/generator.keras')
     discriminator = tf.keras.models.load_model('SavedModels/discriminator.keras')
@@ -46,7 +47,7 @@ loss_object = tf.keras.losses.BinaryCrossentropy(from_logits=True)
 gan = GAN(generator, discriminator, generator_optimizer, discriminator_optimizer, loss_object)
 
 # Train the model
-epochs = 5
+epochs = 200
 training_start_time = datetime.now()
 print(f"Training started at: {training_start_time}")
 
@@ -58,10 +59,9 @@ print(f"Training completed at: {training_end_time}")
 print(f"Total training duration: {training_duration}")
 
 # Save the models
-gan.save_model('SavedModels/generatorRetrain.keras', 'SavedModels/discriminatorRetrain.keras')
+gan.save_model('SavedModels/generator200ep.keras', 'SavedModels/discriminator200ep.keras')
 
 # Save training history
-print(f"History: {history}")
 with open(f'SavedModels/training_history_{datetime.now().strftime("%Y%m%d_%H%M%S")}.json', 'w') as f:
     json.dump({k: [float(x) for x in v] if isinstance(v, list) else float(v) 
            for k, v in history.items()}, f, indent=4)
@@ -72,6 +72,7 @@ plt.figure(figsize=(12, 6))
 plt.subplot(1, 2, 1)
 plt.plot(history['generator_loss'], label='Generator Loss')
 plt.plot(history['discriminator_loss'], label='Discriminator Loss')
+plt.plot(history])
 plt.title('Training Loss')
 plt.xlabel('Epochs')
 plt.ylabel('Loss')
@@ -79,7 +80,7 @@ plt.legend()
 plt.subplot(1, 2, 2)
 plt.plot(history['real_acc'], label='Real Accuracy')
 plt.plot(history['gen_acc'], label='Generated Accuracy')
-plt.title('Training Accuracy')
+plt.title('Discriminator Accuracy')
 plt.xlabel('Epochs')
 plt.ylabel('Accuracy')
 plt.legend()

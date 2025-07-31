@@ -20,6 +20,8 @@ class GAN():
         self.generator_loss = tf.keras.metrics.Mean(name='generator_loss')
         self.l1_loss = tf.keras.metrics.Mean(name='l1_loss')
         self.discriminator_loss = tf.keras.metrics.Mean(name='discriminator_loss')
+        self.generated_accuracy = tf.keras.metrics.Mean(name='generated_accuracy')
+        self.real_accuracy = tf.keras.metrics.Mean(name='real_accuracy')
 
     def generator_loss_fn(self, disc_generated_output: tf.Tensor, gen_output, target: tf.Tensor):
         gan_loss = self.loss_object(tf.ones_like(disc_generated_output), disc_generated_output)
@@ -74,9 +76,20 @@ class GAN():
                 with tqdm(total=len(train_dataset), desc=f'Epoch {epoch+1}/{epochs}', position=0, leave=True) as pbar2:
                     for input_image, target in train_dataset:
                         gen_loss, disc_loss, l1_loss, real_accuracy, generated_accuracy = self.train_step(input_image, target)
-                        [history[key].append(loss) for key, loss in zip(history.keys(), [gen_loss.numpy(), disc_loss.numpy(), l1_loss.numpy(), real_accuracy.numpy(), generated_accuracy.numpy()])]
-                        pbar2.set_postfix(gen_loss=gen_loss.numpy(), disc_loss=disc_loss.numpy(), l1_loss=l1_loss.numpy(), real_acc=real_accuracy.numpy(), gen_acc=generated_accuracy.numpy())
+                        # Update the metrics means
+                        self.generator_loss(gen_loss)
+                        self.discriminator_loss(disc_loss)
+                        self.l1_loss(l1_loss)
+                        self.generated_accuracy(generated_accuracy)
+                        self.real_accuracy(real_accuracy)
+                         # Update the progress bar with the latest losses and accuracies 
+                        pbar2.set_postfix(gen_loss=self.generator_loss.result().numpy(),disc_loss=self.discriminator_loss.result().numpy(),l1_loss=self.l1_loss.result().numpy(),gen_acc= self.generated_accuracy.result().numpy(),real_acc=self.real_accuracy.result().numpy())
                         pbar2.update(1)
+
+                    # Update history with the latest losses and accuracies 
+                    [history[key].append(loss) for key, loss in zip(history.keys(), [self.generator_loss.result(),self.discriminator_loss.result(), self.l1_loss.result(),self.real_accuracy.result(), self.generated_accuracy.result()])]
+                    
+                   
                         
                     # print(f'Epoch {epoch+1}, Generator Loss: {self.generator_loss.result()}, Discriminator Loss: {self.discriminator_loss.result()}')
                     self.generator_loss.reset_state()
