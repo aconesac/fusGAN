@@ -70,7 +70,7 @@ class GAN():
             
             total_loss, gen_loss, l1_loss = self.generator_loss_fn(disc_generated_output, gen_output, target)
         
-        generator_gradients = gen_tape.gradient(gen_loss, self.generator.trainable_variables)
+        generator_gradients = gen_tape.gradient(total_loss, self.generator.trainable_variables)
         self.generator_optimizer.apply_gradients(zip(generator_gradients, self.generator.trainable_variables))
         
         return gen_loss, l1_loss, total_loss
@@ -313,6 +313,45 @@ class Discriminator(Model):
         leaky_relu = tf.keras.layers.LeakyReLU()(batchnorm1)
 
         zero_pad2 = tf.keras.layers.ZeroPadding2D()(leaky_relu)  # (batch_size, 9, 9, 512)
+
+        last = tf.keras.layers.Conv2D(1, 4, strides=1,
+                                      kernel_initializer=initializer)(zero_pad2)  # (batch_size, 6, 6, 1)
+
+        return tf.keras.Model(inputs=[inp, tar], outputs=last)
+
+    def save_model(self, path: str) -> None:
+        self.model.save(path)
+        
+class SmallDiscriminator(Model):
+    def __init__(self, input_channels: int) -> None:
+        super().__init__()
+        self.input_channels = input_channels
+        self.model = self.build_model()
+        self.model_num_params = self.model.count_params()
+        
+    def build_model(self) -> tf.keras.Model:
+        initializer = tf.random_normal_initializer(0., 0.02)
+
+        inp = tf.keras.layers.Input(shape=[128, 128, self.input_channels], name='input_image')
+        tar = tf.keras.layers.Input(shape=[128, 128, 1], name='target_image')
+
+        x = tf.keras.layers.concatenate([inp, tar])  # (batch_size, 128, 128, input_channels + 1)
+        
+        down1 = self.downsample(32, 4, False)(x)  # (batch_size, 64, 64, 32)
+        down2 = self.downsample(64, 4)(down1)  # (batch_size, 32, 32, 64)
+        down3 = self.downsample(128, 4)(down2)  # (batch_size, 16, 16, 128)
+        down4 = self.downsample(128, 4)(down3)  # (batch_size, 8, 8, 128)
+        
+        zero_pad1 = tf.keras.layers.ZeroPadding2D()(down4)  # (batch_size, 10, 10, 128)
+        conv = tf.keras.layers.Conv2D(128, 4, strides=1,
+                                      kernel_initializer=initializer,
+                                      use_bias=False)(zero_pad1)  # (batch_size, 7, 7, 128) 
+        
+        batchnorm1 = tf.keras.layers.BatchNormalization()(conv)
+        
+        leaky_relu = tf.keras.layers.LeakyReLU()(batchnorm1)
+        
+        zero_pad2 = tf.keras.layers.ZeroPadding2D()(leaky_relu)  # (batch_size, 9, 9, 128)
 
         last = tf.keras.layers.Conv2D(1, 4, strides=1,
                                       kernel_initializer=initializer)(zero_pad2)  # (batch_size, 6, 6, 1)
