@@ -43,47 +43,114 @@ class GAN():
         return real_accuracy, generated_accuracy
 
     @tf.function
-    def train_step(self, input_image: tf.Tensor, target: tf.Tensor):
-        # print(target.shape, input_image.shape)
-        with tf.GradientTape() as gen_tape, tf.GradientTape() as disc_tape:
-            gen_output = self.generator(input_image, training=True)
-
+    def discriminator_train_step(self, input_image: tf.Tensor, target: tf.Tensor):
+        """Train only the discriminator"""
+        with tf.GradientTape() as disc_tape:
+            gen_output = self.generator(input_image, training=False)  # Don't train generator here
+            
             disc_real_output = self.discriminator([input_image, target], training=True)
             disc_generated_output = self.discriminator([input_image, gen_output], training=True)
-
-            total_loss, gen_loss, l1_loss  = self.generator_loss_fn(disc_generated_output, gen_output, target)
+            
             disc_loss = self.discriminator_loss_fn(disc_real_output, disc_generated_output)
-
-        generator_gradients = gen_tape.gradient(gen_loss, self.generator.trainable_variables)
+        
         discriminator_gradients = disc_tape.gradient(disc_loss, self.discriminator.trainable_variables)
-
-        self.generator_optimizer.apply_gradients(zip(generator_gradients, self.generator.trainable_variables))
         self.discriminator_optimizer.apply_gradients(zip(discriminator_gradients, self.discriminator.trainable_variables))
-
-        self.generator_loss(gen_loss)
-        self.discriminator_loss(disc_loss)
-        self.l1_loss(l1_loss)
         
         real_accuracy, generated_accuracy = self.discriminator_accuracy_fn(disc_real_output, disc_generated_output)
         
+        return disc_loss, real_accuracy, generated_accuracy, disc_real_output, disc_generated_output
+    
+    @tf.function
+    def generator_train_step(self, input_image: tf.Tensor, target: tf.Tensor):
+        """Train only the generator"""
+        with tf.GradientTape() as gen_tape:
+            gen_output = self.generator(input_image, training=True)
+            
+            disc_generated_output = self.discriminator([input_image, gen_output], training=False)  # Don't train discriminator here
+            
+            total_loss, gen_loss, l1_loss = self.generator_loss_fn(disc_generated_output, gen_output, target)
+        
+        generator_gradients = gen_tape.gradient(gen_loss, self.generator.trainable_variables)
+        self.generator_optimizer.apply_gradients(zip(generator_gradients, self.generator.trainable_variables))
+        
+        return gen_loss, l1_loss, total_loss
+    
+    @tf.function
+    def train_step(self, input_image: tf.Tensor, target: tf.Tensor, train_discriminator: bool = True, train_generator: bool = True):
+        """
+        Combined training step with optional discriminator and generator training
+        
+        Args:
+            input_image: Input tensor
+            target: Target tensor  
+            train_discriminator: Whether to update discriminator weights
+            train_generator: Whether to update generator weights
+        """
+        gen_loss = tf.constant(0.0)
+        disc_loss = tf.constant(0.0)  
+        l1_loss = tf.constant(0.0)
+        real_accuracy = tf.constant(0.0)
+        generated_accuracy = tf.constant(0.0)
+        
+        # Train discriminator if requested
+        if train_discriminator:
+            disc_loss, real_accuracy, generated_accuracy, disc_real_output, disc_generated_output = self.discriminator_train_step(input_image, target)
+            self.discriminator_loss(disc_loss)
+            self.real_accuracy(real_accuracy)
+            self.generated_accuracy(generated_accuracy)
+        
+        # Train generator if requested  
+        if train_generator:
+            gen_loss, l1_loss, total_loss = self.generator_train_step(input_image, target)
+            self.generator_loss(gen_loss)
+            self.l1_loss(l1_loss)
+        
         return gen_loss, disc_loss, l1_loss, real_accuracy, generated_accuracy
         
-    def fit(self, train_dataset, epochs: int):
+    def fit(self, train_dataset, epochs: int, discriminator_ratio: int = 1, generator_ratio: int = 1):
+        """
+        Train the GAN model with customizable training ratios
+        
+        Args:
+            train_dataset: Training dataset
+            epochs: Number of epochs to train
+            discriminator_ratio: How many times to train discriminator per cycle (default: 1)
+            generator_ratio: How many times to train generator per cycle (default: 1)
+        """
         history = {'generator_loss': [], 'discriminator_loss': [], 'l1_loss': [], 
                   'real_acc': [], 'gen_acc': []}
+        
+        step_counter = 0
+        
         with tqdm(total=epochs) as pbar:
             for epoch in range(epochs):
                 with tqdm(total=len(train_dataset), desc=f'Epoch {epoch+1}/{epochs}', position=0, leave=True) as pbar2:
                     for input_image, target in train_dataset:
-                        gen_loss, disc_loss, l1_loss, real_accuracy, generated_accuracy = self.train_step(input_image, target)
-                        # Update the metrics means
-                        self.generator_loss(gen_loss)
-                        self.discriminator_loss(disc_loss)
-                        self.l1_loss(l1_loss)
-                        self.generated_accuracy(generated_accuracy)
-                        self.real_accuracy(real_accuracy)
+                        step_counter += 1
+                        
+                        # Determine what to train based on ratios
+                        cycle_length = discriminator_ratio + generator_ratio
+                        position_in_cycle = (step_counter - 1) % cycle_length
+                        
+                        train_discriminator = position_in_cycle < discriminator_ratio
+                        train_generator = position_in_cycle >= discriminator_ratio
+                        
+                        gen_loss, disc_loss, l1_loss, real_accuracy, generated_accuracy = self.train_step(
+                            input_image, target, train_discriminator, train_generator)
+                        
+                        # Update the metrics means (these are already updated in train_step for active components)
+                        # For inactive components, we'll use the last values
+                        
                          # Update the progress bar with the latest losses and accuracies 
-                        pbar2.set_postfix(gen_loss=self.generator_loss.result().numpy(),disc_loss=self.discriminator_loss.result().numpy(),l1_loss=self.l1_loss.result().numpy(),gen_acc= self.generated_accuracy.result().numpy(),real_acc=self.real_accuracy.result().numpy())
+                        pbar2.set_postfix(
+                            gen_loss=self.generator_loss.result().numpy(),
+                            disc_loss=self.discriminator_loss.result().numpy(),
+                            l1_loss=self.l1_loss.result().numpy(),
+                            gen_acc=self.generated_accuracy.result().numpy(),
+                            real_acc=self.real_accuracy.result().numpy(),
+                            train_d=train_discriminator,
+                            train_g=train_generator
+                        )
                         pbar2.update(1)
 
                     # Update history with the latest losses and accuracies 
@@ -95,6 +162,78 @@ class GAN():
                     self.generator_loss.reset_state()
                     self.discriminator_loss.reset_state()
                     self.l1_loss.reset_state()
+                    self.real_accuracy.reset_state()
+                    self.generated_accuracy.reset_state()
+                    pbar.update(1)
+                    
+                self.generate_images(input_image, target, output_path="out")   
+                    
+        return history
+    
+    def fit_with_alternating_training(self, train_dataset, epochs: int, disc_steps: int = 1, gen_steps: int = 1):
+        """
+        Alternative training method with block-based alternating pattern
+        
+        Args:
+            train_dataset: Training dataset
+            epochs: Number of epochs to train
+            disc_steps: Number of consecutive discriminator training steps
+            gen_steps: Number of consecutive generator training steps
+        """
+        history = {'generator_loss': [], 'discriminator_loss': [], 'l1_loss': [], 
+                  'real_acc': [], 'gen_acc': []}
+        
+        with tqdm(total=epochs) as pbar:
+            for epoch in range(epochs):
+                with tqdm(total=len(train_dataset), desc=f'Epoch {epoch+1}/{epochs}', position=0, leave=True) as pbar2:
+                    batch_iter = iter(train_dataset)
+                    
+                    try:
+                        while True:
+                            # Train discriminator for disc_steps
+                            for _ in range(disc_steps):
+                                input_image, target = next(batch_iter)
+                                gen_loss, disc_loss, l1_loss, real_accuracy, generated_accuracy = self.train_step(
+                                    input_image, target, train_discriminator=True, train_generator=False)
+                                
+                                pbar2.set_postfix(
+                                    gen_loss=self.generator_loss.result().numpy(),
+                                    disc_loss=self.discriminator_loss.result().numpy(),
+                                    l1_loss=self.l1_loss.result().numpy(),
+                                    gen_acc=self.generated_accuracy.result().numpy(),
+                                    real_acc=self.real_accuracy.result().numpy(),
+                                    mode="D"
+                                )
+                                pbar2.update(1)
+                            
+                            # Train generator for gen_steps
+                            for _ in range(gen_steps):
+                                input_image, target = next(batch_iter)
+                                gen_loss, disc_loss, l1_loss, real_accuracy, generated_accuracy = self.train_step(
+                                    input_image, target, train_discriminator=False, train_generator=True)
+                                
+                                pbar2.set_postfix(
+                                    gen_loss=self.generator_loss.result().numpy(),
+                                    disc_loss=self.discriminator_loss.result().numpy(),
+                                    l1_loss=self.l1_loss.result().numpy(),
+                                    gen_acc=self.generated_accuracy.result().numpy(),
+                                    real_acc=self.real_accuracy.result().numpy(),
+                                    mode="G"
+                                )
+                                pbar2.update(1)
+                                
+                    except StopIteration:
+                        # End of dataset
+                        pass
+
+                    # Update history with the latest losses and accuracies 
+                    [history[key].append(loss) for key, loss in zip(history.keys(), [self.generator_loss.result(),self.discriminator_loss.result(), self.l1_loss.result(),self.real_accuracy.result(), self.generated_accuracy.result()])]
+                    
+                    self.generator_loss.reset_state()
+                    self.discriminator_loss.reset_state()
+                    self.l1_loss.reset_state()
+                    self.real_accuracy.reset_state()
+                    self.generated_accuracy.reset_state()
                     pbar.update(1)
                     
                 self.generate_images(input_image, target, output_path="out")   

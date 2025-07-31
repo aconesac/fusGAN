@@ -51,7 +51,7 @@ epochs = 200
 training_start_time = datetime.now()
 print(f"Training started at: {training_start_time}")
 
-history = gan.fit(train_dataset, epochs)
+history = gan.fit(train_dataset, epochs, discriminator_ratio=1, generator_ratio=3)
 
 training_end_time = datetime.now()
 training_duration = training_end_time - training_start_time
