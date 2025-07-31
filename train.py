@@ -51,6 +51,8 @@ epochs = 200
 training_start_time = datetime.now()
 print(f"Training started at: {training_start_time}")
 
+disc_ratio = 1  # Number of discriminator training steps per cycle
+gen_ratio 
 history = gan.fit(train_dataset, epochs, discriminator_ratio=1, generator_ratio=3)
 
 training_end_time = datetime.now()
@@ -104,12 +106,25 @@ training_info = {
     
     # Training parameters
     'epochs': epochs,
+    'discriminator_ratio': 1,  # Number of discriminator training steps per cycle
+    'generator_ratio': 3,      # Number of generator training steps per cycle
+    'training_method': 'batch_level_ratios',  # Indicates ratios are applied at batch level
     'generator_optimizer': str(generator_optimizer.get_config()),
     'discriminator_optimizer': str(discriminator_optimizer.get_config()),
     'loss_object': str(loss_object.get_config()),
     
     # Dataset information
     'dataset_info': dataset_info,
+    
+    # Training history summary
+    'training_results': {
+        'final_generator_loss': float(history['generator_loss'][-1]) if history['generator_loss'] else None,
+        'final_discriminator_loss': float(history['discriminator_loss'][-1]) if history['discriminator_loss'] else None,
+        'final_l1_loss': float(history['l1_loss'][-1]) if history['l1_loss'] else None,
+        'final_real_accuracy': float(history['real_acc'][-1]) if history['real_acc'] else None,
+        'final_generated_accuracy': float(history['gen_acc'][-1]) if history['gen_acc'] else None,
+        'training_stable': True if len(history['generator_loss']) == epochs else False
+    },
     
     # Configuration from config.py
     'config': {

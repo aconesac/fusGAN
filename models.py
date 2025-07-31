@@ -106,71 +106,8 @@ class GAN():
             self.l1_loss(l1_loss)
         
         return gen_loss, disc_loss, l1_loss, real_accuracy, generated_accuracy
-        
-    def fit(self, train_dataset, epochs: int, discriminator_ratio: int = 1, generator_ratio: int = 1):
-        """
-        Train the GAN model with customizable training ratios
-        
-        Args:
-            train_dataset: Training dataset
-            epochs: Number of epochs to train
-            discriminator_ratio: How many times to train discriminator per cycle (default: 1)
-            generator_ratio: How many times to train generator per cycle (default: 1)
-        """
-        history = {'generator_loss': [], 'discriminator_loss': [], 'l1_loss': [], 
-                  'real_acc': [], 'gen_acc': []}
-        
-        step_counter = 0
-        
-        with tqdm(total=epochs) as pbar:
-            for epoch in range(epochs):
-                with tqdm(total=len(train_dataset), desc=f'Epoch {epoch+1}/{epochs}', position=0, leave=True) as pbar2:
-                    for input_image, target in train_dataset:
-                        step_counter += 1
-                        
-                        # Determine what to train based on ratios
-                        cycle_length = discriminator_ratio + generator_ratio
-                        position_in_cycle = (step_counter - 1) % cycle_length
-                        
-                        train_discriminator = position_in_cycle < discriminator_ratio
-                        train_generator = position_in_cycle >= discriminator_ratio
-                        
-                        gen_loss, disc_loss, l1_loss, real_accuracy, generated_accuracy = self.train_step(
-                            input_image, target, train_discriminator, train_generator)
-                        
-                        # Update the metrics means (these are already updated in train_step for active components)
-                        # For inactive components, we'll use the last values
-                        
-                         # Update the progress bar with the latest losses and accuracies 
-                        pbar2.set_postfix(
-                            gen_loss=self.generator_loss.result().numpy(),
-                            disc_loss=self.discriminator_loss.result().numpy(),
-                            l1_loss=self.l1_loss.result().numpy(),
-                            gen_acc=self.generated_accuracy.result().numpy(),
-                            real_acc=self.real_accuracy.result().numpy(),
-                            train_d=train_discriminator,
-                            train_g=train_generator
-                        )
-                        pbar2.update(1)
-
-                    # Update history with the latest losses and accuracies 
-                    [history[key].append(loss) for key, loss in zip(history.keys(), [self.generator_loss.result(),self.discriminator_loss.result(), self.l1_loss.result(),self.real_accuracy.result(), self.generated_accuracy.result()])]
-                    
-                   
-                        
-                    # print(f'Epoch {epoch+1}, Generator Loss: {self.generator_loss.result()}, Discriminator Loss: {self.discriminator_loss.result()}')
-                    self.generator_loss.reset_state()
-                    self.discriminator_loss.reset_state()
-                    self.l1_loss.reset_state()
-                    self.real_accuracy.reset_state()
-                    self.generated_accuracy.reset_state()
-                    pbar.update(1)
-                    
-                self.generate_images(input_image, target, output_path="out")   
-                    
-        return history
     
-    def fit_with_alternating_training(self, train_dataset, epochs: int, disc_steps: int = 1, gen_steps: int = 1):
+    def fit(self, train_dataset, epochs: int, disc_steps: int = 1, gen_steps: int = 1):
         """
         Alternative training method with block-based alternating pattern
         
