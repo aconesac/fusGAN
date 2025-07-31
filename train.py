@@ -25,7 +25,7 @@ dataset_info = {
 
 # Define optimizers
 generator_optimizer = tf.keras.optimizers.Adam(2e-4, beta_1=0.5)
-discriminator_optimizer = tf.keras.optimizers.Adam(2e-4, beta_1=0.5)
+discriminator_optimizer = tf.keras.optimizers.Adam(1e-5, beta_1=0.5)
 
 # Check if models exist for retraining
 model_retraining = False
@@ -106,8 +106,8 @@ training_info = {
     
     # Training parameters
     'epochs': epochs,
-    'discriminator_ratio': 1,  # Number of discriminator training steps per cycle
-    'generator_ratio': 3,      # Number of generator training steps per cycle
+    'discriminator_ratio': disc_ratio,  # Number of discriminator training steps per cycle
+    'generator_ratio': gen_ratio,      # Number of generator training steps per cycle
     'training_method': 'batch_level_ratios',  # Indicates ratios are applied at batch level
     'generator_optimizer': str(generator_optimizer.get_config()),
     'discriminator_optimizer': str(discriminator_optimizer.get_config()),

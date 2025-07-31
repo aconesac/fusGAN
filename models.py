@@ -70,7 +70,7 @@ class GAN():
             
             total_loss, gen_loss, l1_loss = self.generator_loss_fn(disc_generated_output, gen_output, target)
         
-        generator_gradients = gen_tape.gradient(gen_loss, self.generator.trainable_variables)
+        generator_gradients = gen_tape.gradient(total_loss, self.generator.trainable_variables)
         self.generator_optimizer.apply_gradients(zip(generator_gradients, self.generator.trainable_variables))
         
         return gen_loss, l1_loss, total_loss
